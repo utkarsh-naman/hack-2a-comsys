@@ -1,0 +1,99 @@
+import os
+import torch
+import timm
+from torch import nn
+from torchvision import transforms
+from PIL import Image
+from tqdm import tqdm
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+# Model Definition
+class EmbeddingNet(nn.Module):
+    def __init__(self, backbone='resnet50', embedding_size=512):
+        super().__init__()
+        self.backbone = timm.create_model(backbone, pretrained=True, num_classes=0)
+        self.fc = nn.Linear(self.backbone.num_features, embedding_size)
+        self.bn = nn.BatchNorm1d(embedding_size)
+
+    def forward(self, x):
+        x = self.backbone(x)
+        x = self.fc(x)
+        x = self.bn(x)
+        return x
+
+# Extract representative embedding for each train class
+def get_class_embeddings(model, root_dir, transform, device):
+    model.eval()
+    embeddings = {}
+    with torch.no_grad():
+        for cls in sorted(os.listdir(root_dir)):
+            class_dir = os.path.join(root_dir, cls)
+            if not os.path.isdir(class_dir): continue
+
+            for root, _, files in os.walk(class_dir):
+                for fname in files:
+                    if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        path = os.path.join(root, fname)
+                        img = transform(Image.open(path).convert('RGB')).unsqueeze(0).to(device)
+                        emb = model(img).squeeze().cpu()
+                        embeddings[cls] = emb
+                        break
+                if cls in embeddings:
+                    break
+    return embeddings
+
+def evaluate():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Using device:", device)
+
+    transform = transforms.Compose([
+        transforms.Resize((112, 112)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5]*3, [0.5]*3)
+    ])
+
+    model = EmbeddingNet().to(device)
+    model.load_state_dict(torch.load("tb_model.pth", map_location=device))
+    model.eval()
+    print("Loaded model from tb_model.pth")
+
+    class_embeddings = get_class_embeddings(model, "train", transform, device)
+    if not class_embeddings:
+        print("No class embeddings found. Make sure 'train/' folder is correct.")
+        return
+
+    y_true, y_pred = [], []
+
+    with torch.no_grad():
+        for cls in sorted(os.listdir("val")):
+            class_dir = os.path.join("val", cls)
+            if not os.path.isdir(class_dir): continue
+
+            for root, _, files in os.walk(class_dir):
+                for fname in files:
+                    if not fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        continue
+
+                    path = os.path.join(root, fname)
+                    img = transform(Image.open(path).convert('RGB')).unsqueeze(0).to(device)
+                    emb = model(img).squeeze().cpu()
+
+                    pred_cls = max(class_embeddings,
+                                   key=lambda c: torch.cosine_similarity(emb, class_embeddings[c], dim=0).item())
+
+                    y_true.append(cls)
+                    y_pred.append(pred_cls)
+
+    print(classification_report(y_true, y_pred, digits=4))
+
+    cm = confusion_matrix(y_true, y_pred, labels=sorted(class_embeddings.keys()))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=sorted(class_embeddings.keys()))
+    disp.plot(xticks_rotation=90, cmap="Blues")
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+    plt.savefig("confusion_matrix.png")
+    print("Saved confusion matrix as confusion_matrix.png")
+
+if __name__ == "__main__":
+    evaluate()
