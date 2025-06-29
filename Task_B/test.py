@@ -5,8 +5,10 @@ from torch import nn
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, f1_score
+import warnings
+
+warnings.filterwarnings("ignore")
 
 # Model Definition
 class EmbeddingNet(nn.Module):
@@ -85,15 +87,12 @@ def evaluate():
                     y_true.append(cls)
                     y_pred.append(pred_cls)
 
-    print(classification_report(y_true, y_pred, digits=4))
+    # Evaluation
+    top1_acc = accuracy_score(y_true, y_pred)
+    macro_f1 = f1_score(y_true, y_pred, average='macro')
 
-    cm = confusion_matrix(y_true, y_pred, labels=sorted(class_embeddings.keys()))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=sorted(class_embeddings.keys()))
-    disp.plot(xticks_rotation=90, cmap="Blues")
-    plt.title("Confusion Matrix")
-    plt.tight_layout()
-    plt.savefig("confusion_matrix.png")
-    print("Saved confusion matrix as confusion_matrix.png")
+    print(f"Top-1 Accuracy: {top1_acc:.4f}")
+    print(f"Macro-averaged F1-Score: {macro_f1:.4f}")
 
 if __name__ == "__main__":
     evaluate()
