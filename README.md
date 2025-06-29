@@ -103,12 +103,6 @@ Evaluation Metrics:
 - Top-1 Accuracy
 - Macro-averaged F1-Score
 
-Example Output:
-```
-Top-1 Accuracy: 0.8889  
-Macro-averaged F1-Score: 0.8857
-```
-
 ---
 
 ## Requirements
