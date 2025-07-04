@@ -65,7 +65,7 @@ def evaluate():
         print("No class embeddings found. Make sure 'train/' folder is correct.")
         return
 
-    y_true, y_pred = [], []
+    y_true, y_pred = []
 
     with torch.no_grad():
         for cls in sorted(os.listdir("val")):
@@ -91,8 +91,7 @@ def evaluate():
     top1_acc = accuracy_score(y_true, y_pred)
     macro_f1 = f1_score(y_true, y_pred, average='macro')
 
-    print(f"Top-1 Accuracy: {top1_acc:.4f}")
-    print(f"Macro-averaged F1-Score: {macro_f1:.4f}")
+    print(f"Evaluation Metrics: Top-1 Accuracy = {top1_acc:.4f} | Macro-averaged F1-Score = {macro_f1:.4f}")
 
 if __name__ == "__main__":
     evaluate()
