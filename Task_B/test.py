@@ -5,7 +5,7 @@ from torch import nn
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -65,7 +65,7 @@ def evaluate():
         print("No class embeddings found. Make sure 'train/' folder is correct.")
         return
 
-    y_true, y_pred = []
+    y_true, y_pred = [], []
 
     with torch.no_grad():
         for cls in sorted(os.listdir("val")):
@@ -90,8 +90,13 @@ def evaluate():
     # Evaluation
     top1_acc = accuracy_score(y_true, y_pred)
     macro_f1 = f1_score(y_true, y_pred, average='macro')
+    macro_precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    macro_recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
 
-    print(f"Evaluation Metrics: Top-1 Accuracy = {top1_acc:.4f} | Macro-averaged F1-Score = {macro_f1:.4f}")
+    print(f"Top-1 Accuracy       : {top1_acc:.4f}")
+    print(f"Macro F1-Score       : {macro_f1:.4f}")
+    print(f"Macro Precision      : {macro_precision:.4f}")
+    print(f"Macro Recall         : {macro_recall:.4f}")
 
 if __name__ == "__main__":
     evaluate()
