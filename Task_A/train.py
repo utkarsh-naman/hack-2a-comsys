@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import cv2
 from PIL import Image
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -101,6 +102,7 @@ def main():
     for epoch in range(num_epochs):
         model.train()
         running_loss, correct, total = 0.0, 0, 0
+        all_preds, all_labels = [], []
 
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
@@ -116,8 +118,16 @@ def main():
             correct += (preds == labels).sum().item()
             total += labels.size(0)
 
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
         train_acc = 100 * correct / total
         scheduler.step()
+
+        # Compute training metrics
+        precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
+        recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
+        f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
 
         # Validation
         model.eval()
@@ -133,12 +143,12 @@ def main():
         val_acc = 100 * val_correct / val_total
 
         print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {running_loss:.4f} "
-              f"Train Acc: {train_acc:.2f}%  Val Acc: {val_acc:.2f}%")
+              f"Train Acc: {train_acc:.2f}%  Val Acc: {val_acc:.2f}% "
+              f"Precision: {precision:.2f}  Recall: {recall:.2f}  F1: {f1:.2f}")
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save(model.state_dict(), model_path)
-
     print(f"\n✅ Training completed. Best Validation Accuracy: {best_val_acc:.2f}%")
 
 if __name__ == "__main__":
