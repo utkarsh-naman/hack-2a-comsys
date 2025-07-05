@@ -7,6 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 from tqdm import tqdm
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # Dataset
 class TripletFaceDataset(Dataset):
@@ -110,6 +111,9 @@ def train():
     model.train()
     for epoch in range(20):
         total_loss = 0
+        all_preds = []
+        all_labels = []
+
         for anchor, positive, negative in tqdm(dataloader, desc=f"Epoch {epoch+1}"):
             anchor, positive, negative = anchor.to(device), positive.to(device), negative.to(device)
             emb_a = model(anchor)
@@ -122,7 +126,25 @@ def train():
             optimizer.step()
 
             total_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {total_loss/len(dataloader):.4f}")
+
+            # --- Metric Calculation ---
+            # Euclidean distance
+            dist_pos = torch.norm(emb_a - emb_p, p=2, dim=1)
+            dist_neg = torch.norm(emb_a - emb_n, p=2, dim=1)
+
+            preds = (dist_pos < dist_neg).long().cpu().numpy()   # 1 if positive closer
+            labels = torch.ones_like(preds)                      # Ground truth: 1 (positive should be closer)
+            all_preds.extend(preds)
+            all_labels.extend(labels)
+
+        acc = accuracy_score(all_labels, all_preds)
+        prec = precision_score(all_labels, all_preds, zero_division=0)
+        rec = recall_score(all_labels, all_preds, zero_division=0)
+        f1 = f1_score(all_labels, all_preds, zero_division=0)
+
+        print(f"Epoch {epoch+1}, Loss: {total_loss/len(dataloader):.4f} | "
+              f"Acc: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}")
+
 
     torch.save(model.state_dict(), 'tb_model.pth')
     print("Model saved as tb_model.pth")
